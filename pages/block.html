@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Blocked - AI Web Filter</title>
+    <link rel="stylesheet" href="block.css">
+    <script src="../utils/feather-icons.min.js"></script>
+    <script src="../block.js" defer></script> <!-- Include external script here -->
+</head>
+<body>
+    <div class="container">
+        <div class="block-message">
+            <div class="icon-container">
+                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-shield-off"><path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"></path><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+            </div>
+
+            <h1>Content Blocked</h1>
+
+            <div id="block-reason">
+                <p>This content has been blocked by AI Web Filter for your safety.</p>
+                <div id="specific-reason"></div>
+                <div id="error-message" style="color: #721c24; background: #f8d7da; padding: 10px; margin-top: 10px; border-radius: 4px; display: none;"></div>
+            </div>
+
+            <div class="blocked-url">
+                <p>Blocked URL: <span id="blocked-url"></span></p>
+            </div>
+
+            <div class="actions">
+                <button id="back-button" class="action-button">Go Back</button>
+                <button id="settings-button" class="action-button">Extension Settings</button>
+            </div>
+        </div>
+
+        <div class="education-section">
+            <h2>Why was this content blocked?</h2>
+            <div id="nsfw-explanation" class="explanation" style="display:none;">
+                <h3>NSFW Content</h3>
+                <p>This content was detected to contain explicit material inappropriate for certain audiences.</p>
+            </div>
+            <div id="violence-explanation" class="explanation" style="display:none;">
+                <h3>Violent Content</h3>
+                <p>This content was detected to contain violent material that may be disturbing.</p>
+            </div>
+            <div id="suicide-explanation" class="explanation" style="display:none;">
+                <h3>Self-Harm or Suicidal Content</h3>
+                <p>This content was detected to potentially contain material related to self-harm or suicide.</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>Protected by AI Web Filter</p>
+        </footer>
+    </div>
+</body>
+</html>

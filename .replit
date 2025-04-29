@@ -1,0 +1,48 @@
+modules = ["nodejs-20", "python-3.11"]
+
+[nix]
+channel = "stable-24_05"
+packages = ["zip"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Web Server"
+
+[[workflows.workflow]]
+name = "Web Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd dist && python -m http.server 5000"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Package Extension"
+author = 41849505
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "zip -r extension.zip manifest.json background.js content.js popup/* pages/* utils/* filters/* models/* generated-icon.png"
+
+[deployment]
+run = ["sh", "-c", "cd dist && python -m http.server 5000"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
