@@ -1,0 +1,143 @@
+"Build a complete Chrome Extension (compatible with Firefox and Edge too) that filters web content in real time using AI models. The extension should behave like Blocksi AI Web Filter but with advanced intelligence and the following features:
+
+🛡 Core Features:
+
+Website Blocking in Real Time:
+
+If a website contains NSFW (pornographic), violent, or suicidal content, block it completely.
+
+Show a custom block page explaining why the site is blocked.
+
+Even newly created or user-generated sites like Reddit, Imgur, etc. should be analyzed and blocked if unsafe.
+
+Search Query Filtering:
+
+Use BERT NLP Model to analyze the user’s search intent in real time.
+
+Block search results if the query contains harmful or explicit intent THAT INVOLVES ADULT CONTENT,VIOLENCE,SUICIDE.
+
+Allow queries related to education, such as:
+
+“sex education”
+
+“breast cancer diagnosis”
+
+“human anatomy study”
+ETC
+
+Do not block them. Instead, pass them through with light monitoring.
+
+NSFW Image Detection & Blurring:
+
+Use NSFW.js (TensorFlow.js model) in the browser to detect explicit images.
+
+Automatically blur or block inappropriate images using JavaScript in real time.
+
+YOLO Video Frame Filtering:
+
+Use YOLOv5 or YOLOv8 (hosted or pre-trained) to analyze video content in real time.
+
+Block or blur frames containing adult/violent/self-harm scenes.
+
+Should work on platforms like YouTube, Reddit, and news sites.
+
+Incognito Mode Protection:
+
+Ensure the extension works in incognito mode using manifest.json config: incognito: "spanning".
+
+Cannot be disabled or bypassed via Incognito.
+
+Password Protection (Built-in):
+
+The extension should have password protection by default.
+
+
+Admin panel should only be accessible with a password.
+
+Educational Mode (Smart Whitelisting):
+
+Allow content only if it is intended for verified educational purposes.
+
+Examples: “sex education video,” “cervical cancer stages,” “LGBTQ+ mental health”
+
+Use NLP to differentiate between safe and unsafe use of the same keywords.
+
+🧱 Tech Stack:
+
+JavaScript + Chrome Extension APIs (for frontend/content scripts)
+
+HTML + CSS (for UI / Popup interface / Block page)
+
+TensorFlow.js (for running NSFW.js in browser)
+
+BERT NLP (via Hugging Face Transformers or API)
+
+YOLOv5 or YOLOv8 (hosted or run via Python backend)
+
+Python + Flask/FastAPI (for AI model analysis backend if needed)
+
+AES Encryption (for password security)
+
+Chrome Storage API (for saving settings)
+
+Optional: Firebase or LocalStorage for logs and monitoring
+
+📦 Extension UI:
+
+A simple popup with:
+
+Toggle switches for categories (NSFW, violence, suicide)
+
+Admin password setting
+
+Filter sensitivity level
+
+Educational mode ON/OFF
+
+🔒 Security:
+
+Prevent disabling via chrome://extensions
+
+Ensure consistent filtering across tabs, incognito, and reboots
+
+Encrypted password handling
+
+Detect tampering or unauthorized access
+
+🧪 Test Cases:
+
+Search “porn” → Block query
+
+Search “sex education” → Allow
+
+Visit reddit.com/r/nsfw → Block site
+
+Open Incognito tab → Filter still works
+
+Try to disable extension → Ask for password
+
+⚠ Note:
+
+Do not use static blocklists. All filtering must be done using AI content analysis.
+
+All blocking decisions should happen in real time, including dynamically loaded content.
+
+Generate full source code for the extension, including:
+
+manifest.json (Manifest V3)
+
+background.js
+
+content.js
+
+popup.html
+
+popup.js
+
+block.html
+
+password.js
+
+integration with BERT, NSFW.js, and YOLO models
+
+Ensure that the code is clean, modular, production-ready, and does not contain any runtime errors."

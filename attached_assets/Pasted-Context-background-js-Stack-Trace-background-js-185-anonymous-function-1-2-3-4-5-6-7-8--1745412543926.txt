@@ -1,0 +1,422 @@
+Context
+background.js
+Stack Trace
+background.js:185 (anonymous function)
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190
+191
+192
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+'use strict';
+
+// Import utilities with ES modules
+import * as storage from './utils/storage.js';
+import { verifyPassword, setPassword } from './utils/password.js';
+import { initBertModel } from './models/bert-model.js';
+import { analyzeSearchIntent } from './filters/search-filter.js';
+
+const { getSettings, saveSettings } = storage;
+
+// Extension state
+let isInitialized = false;
+let settings = {
+  enabled: true,
+  nsfwFilter: true,
+  violenceFilter: true,
+  suicideFilter: true,
+  educationalMode: true,
+  sensitivity: 'medium', // low, medium, high
+  isPasswordProtected: false,
+  password: ''
+};
+
+// Initialize extension
+async function initialize() {
+  if (isInitialized) return;
+
+  try {
+    // Load settings
+    const savedSettings = await getSettings();
+    if (savedSettings) {
+      settings = { ...settings, ...savedSettings };
+    }
+
+    // Initialize BERT model
+    await initBertModel();
+
+    isInitialized = true;
+    console.log('AI Web Filter initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize AI Web Filter:', error);
+  }
+}
+
+// Handle messages from content scripts and popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  switch (message.type) {
+    case 'GET_SETTINGS':
+      sendResponse({ settings });
+      break;
+
+    case 'UPDATE_SETTINGS':
+      updateSettings(message.settings, sendResponse);
+      return true;
+
+    case 'CHECK_URL':
+      checkPageContent(message.url, message.content, sendResponse);
+      return true;
+
+    case 'ANALYZE_SEARCH_QUERY':
+      analyzeSearchQuery(message.query, message.searchEngine, sendResponse);
+      return true;
+
+    case 'VERIFY_PASSWORD':
+      verifyPassword(message.password, sendResponse);
+      return true;
+
+    case 'SET_PASSWORD':
+      setPassword(message.password, message.oldPassword, sendResponse);
+      return true;
+  }
+});
+
+// Handle tab navigation
+chrome.webNavigation.onCommitted.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+
+  if (!isInitialized) {
+    await initialize();
+  }
+
+  if (!settings.enabled) return;
+
+  if (isSearchEngineUrl(details.url)) {
+    const query = extractSearchQuery(details.url);
+    if (query) {
+      const analysis = await analyzeSearchIntent(query);
+
+      if (analysis.shouldBlock && !analysis.isEducational) {
+        chrome.tabs.update(details.tabId, {
+          url: chrome.runtime.getURL('pages/block.html') + 
+               `?reason=search&query=${encodeURIComponent(query)}`
+        });
+      }
+    }
+  }
+});
+
+// Update settings
+async function updateSettings(newSettings, sendResponse) {
+  try {
+    settings = { ...settings, ...newSettings };
+    await saveSettings(settings);
+    sendResponse({ success: true, settings });
+  } catch (error) {
+    console.error('Failed to update settings:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Check if the page content should be blocked
+async function checkPageContent(url, content, sendResponse) {
+  try {
+    if (!settings.enabled) {
+      sendResponse({ shouldBlock: false });
+      return;
+    }
+
+    const analysisResult = {
+      containsNSFW: settings.nsfwFilter ? await checkForNSFW(content) : false,
+      containsViolence: settings.violenceFilter ? await checkForViolence(content) : false,
+      containsSuicide: settings.suicideFilter ? await checkForSuicide(content) : false,
+      isEducational: settings.educationalMode ? await checkIfEducational(content) : false
+    };
+
+    const shouldBlock = (
+      (analysisResult.containsNSFW || 
+       analysisResult.containsViolence || 
+       analysisResult.containsSuicide) && 
+      !analysisResult.isEducational
+    );
+
+    let blockReason = '';
+    if (analysisResult.containsNSFW) blockReason = 'nsfw';
+    else if (analysisResult.containsViolence) blockReason = 'violence';
+    else if (analysisResult.containsSuicide) blockReason = 'suicide';
+
+    sendResponse({ 
+      shouldBlock, 
+      reason: blockReason,
+      analysis: analysisResult
+    });
+  } catch (error) {
+    console.error('Error analyzing page content:', error);
+    sendResponse({ shouldBlock: false, error: error.message });
+  }
+}
+
+// Check if the URL is a search engine
+function isSearchEngineUrl(url) {
+  const searchEngines = [
+    { domain: 'google.com', queryParam: 'q' },
+    { domain: 'bing.com', queryParam: 'q' },
+    { domain: 'yahoo.com', queryParam: 'p' },
+    { domain: 'duckduckgo.com', queryParam: 'q' },
+    { domain: 'yandex.com', queryParam: 'text' },
+    { domain: 'baidu.com', queryParam: 'wd' }
+  ];
+
+  return searchEngines.some(engine => url.includes(engine.domain));
+}
+
+// Extract search query from URL
+function extractSearchQuery(url) {
+  const urlObj = new URL(url);
+  const queryParams = ['q', 'query', 'p', 'text', 'wd', 'search'];
+
+  for (const param of queryParams) {
+    const query = urlObj.searchParams.get(param);
+    if (query) return query;
+  }
+
+  return null;
+}
+
+// Initialize the extension when installed or updated
+chrome.runtime.onInstalled.addListener(async () => {
+  await initialize();
+});
+
+// Initialize when browser starts
+initialize();
+
+// Placeholder functions -  These need to be implemented based on your actual logic.
+async function getSettings() {

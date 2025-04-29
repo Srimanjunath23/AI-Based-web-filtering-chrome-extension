@@ -1,0 +1,232 @@
+'use strict';
+
+// Import utilities with ES modules
+import { getSettings, saveSettings } from './utils/storage.js';
+import { verifyPassword, setPassword } from './utils/password.js';
+import { initBertModel } from './models/bert-model.js';
+import { analyzeSearchIntent } from './filters/search-filter.js';
+
+
+// Extension state
+let isInitialized = false;
+let settings = {
+  enabled: true,
+  nsfwFilter: true,
+  violenceFilter: true,
+  suicideFilter: true,
+  educationalMode: true,
+  sensitivity: 'medium', // low, medium, high
+  isPasswordProtected: false,
+  password: ''
+};
+
+// Initialize extension
+async function initialize() {
+  if (isInitialized) return;
+
+  try {
+    // Load settings
+    const savedSettings = await getSettings();
+    if (savedSettings) {
+      settings = { ...settings, ...savedSettings };
+    }
+
+    // Initialize BERT model
+    await initBertModel();
+
+    isInitialized = true;
+    console.log('AI Web Filter initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize AI Web Filter:', error);
+  }
+}
+
+// Handle messages from content scripts and popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  switch (message.type) {
+    case 'GET_SETTINGS':
+      sendResponse({ settings });
+      break;
+
+    case 'UPDATE_SETTINGS':
+      updateSettings(message.settings, sendResponse);
+      return true;
+
+    case 'CHECK_URL':
+      checkPageContent(message.url, message.content, sendResponse);
+      return true;
+
+    case 'ANALYZE_SEARCH_QUERY':
+      analyzeSearchQuery(message.query, message.searchEngine, sendResponse);
+      return true;
+
+    case 'VERIFY_PASSWORD':
+      verifyPassword(message.password, sendResponse);
+      return true;
+
+    case 'SET_PASSWORD':
+      setPassword(message.password, message.oldPassword, sendResponse);
+      return true;
+  }
+});
+
+// Handle tab navigation
+chrome.webNavigation.onCommitted.addListener(async (details) => {
+  if (details.frameId !== 0) return;
+
+  if (!isInitialized) {
+    await initialize();
+  }
+
+  if (!settings.enabled) return;
+
+  if (isSearchEngineUrl(details.url)) {
+    const query = extractSearchQuery(details.url);
+    if (query) {
+      const analysis = await analyzeSearchIntent(query);
+
+      if (analysis.shouldBlock && !analysis.isEducational) {
+        chrome.tabs.update(details.tabId, {
+          url: chrome.runtime.getURL('pages/block.html') + 
+               `?reason=search&query=${encodeURIComponent(query)}`
+        });
+      }
+    }
+  }
+});
+
+// Update settings
+async function updateSettings(newSettings, sendResponse) {
+  try {
+    settings = { ...settings, ...newSettings };
+    await saveSettings(settings);
+    sendResponse({ success: true, settings });
+  } catch (error) {
+    console.error('Failed to update settings:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Check if the page content should be blocked
+async function checkPageContent(url, content, sendResponse) {
+  try {
+    if (!settings.enabled) {
+      sendResponse({ shouldBlock: false });
+      return;
+    }
+
+    const analysisResult = {
+      containsNSFW: settings.nsfwFilter ? await checkForNSFW(content) : false,
+      containsViolence: settings.violenceFilter ? await checkForViolence(content) : false,
+      containsSuicide: settings.suicideFilter ? await checkForSuicide(content) : false,
+      isEducational: settings.educationalMode ? await checkIfEducational(content) : false
+    };
+
+    const shouldBlock = (
+      (analysisResult.containsNSFW || 
+       analysisResult.containsViolence || 
+       analysisResult.containsSuicide) && 
+      !analysisResult.isEducational
+    );
+
+    let blockReason = '';
+    if (analysisResult.containsNSFW) blockReason = 'nsfw';
+    else if (analysisResult.containsViolence) blockReason = 'violence';
+    else if (analysisResult.containsSuicide) blockReason = 'suicide';
+
+    sendResponse({ 
+      shouldBlock, 
+      reason: blockReason,
+      analysis: analysisResult
+    });
+  } catch (error) {
+    console.error('Error analyzing page content:', error);
+    sendResponse({ shouldBlock: false, error: error.message });
+  }
+}
+
+// Check if the URL is a search engine
+function isSearchEngineUrl(url) {
+  const searchEngines = [
+    { domain: 'google.com', queryParam: 'q' },
+    { domain: 'bing.com', queryParam: 'q' },
+    { domain: 'yahoo.com', queryParam: 'p' },
+    { domain: 'duckduckgo.com', queryParam: 'q' },
+    { domain: 'yandex.com', queryParam: 'text' },
+    { domain: 'baidu.com', queryParam: 'wd' }
+  ];
+
+  return searchEngines.some(engine => url.includes(engine.domain));
+}
+
+// Extract search query from URL
+function extractSearchQuery(url) {
+  const urlObj = new URL(url);
+  const queryParams = ['q', 'query', 'p', 'text', 'wd', 'search'];
+
+  for (const param of queryParams) {
+    const query = urlObj.searchParams.get(param);
+    if (query) return query;
+  }
+
+  return null;
+}
+
+// Initialize the extension when installed or updated
+chrome.runtime.onInstalled.addListener(async () => {
+  await initialize();
+});
+
+// Initialize when browser starts
+initialize();
+
+// Placeholder functions -  These need to be implemented based on your actual logic.
+async function getSettings() {
+  //Implementation to retrieve settings from storage
+  return {};
+}
+
+async function saveSettings(settings) {
+  //Implementation to save settings to storage
+}
+
+async function initBertModel() {
+  //Implementation to initialize the BERT model
+}
+
+async function checkForNSFW(content) {
+  //Implementation to check for NSFW content
+  return false;
+}
+
+async function checkForViolence(content) {
+  //Implementation to check for violence
+  return false;
+}
+
+async function checkForSuicide(content) {
+  //Implementation to check for suicide-related content
+  return false;
+}
+
+async function checkIfEducational(content) {
+  //Implementation to check if content is educational
+  return false;
+}
+
+async function analyzeSearchIntent(query) {
+    //Implementation to analyze search intent
+    return {shouldBlock: false, isEducational: false};
+}
+
+async function analyzeSearchQuery(query, searchEngine, sendResponse) {
+  //Implementation to analyze search query
+}
+
+async function verifyPassword(password, sendResponse) {
+  //Implementation to verify password
+}
+
+async function setPassword(password, oldPassword, sendResponse) {
+  //Implementation to set password
+}
