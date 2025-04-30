@@ -44,11 +44,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set block reason specific message
     switch (blockReason) {
-        // handle reasons
+        case "nsfw":
+            specificReason.innerHTML = `<p>Access blocked due to <strong>NSFW (Not Safe for Work)</strong> content.</p>`;
+            document.getElementById("nsfw-explanation").style.display = "block";
+            break;
+    
+        case "violence":
+            specificReason.innerHTML = `<p>Access blocked due to <strong>violent or graphic content</strong>.</p>`;
+            document.getElementById("violence-explanation").style.display = "block";
+            break;
+    
+        case "suicide":
+            specificReason.innerHTML = `<p>Access blocked due to <strong>content related to self-harm or suicide</strong>.</p>`;
+            document.getElementById("suicide-explanation").style.display = "block";
+            break;
+    
+
         default:
-            specificReason.innerHTML = `<p>This content was blocked based on our AI content filtering system.</p>`;
+            specificReason.innerHTML = `<p>This content was blocked based on our <strong>AI content filtering system</strong>.</p>`;
             break;
     }
+    
 
     // Set up event listeners
     backButton.addEventListener('click', () => {

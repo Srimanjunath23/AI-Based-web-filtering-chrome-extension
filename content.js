@@ -1,3 +1,4 @@
+//updated on 1/5/25
 'use strict';
 
 // Global variables
@@ -41,33 +42,84 @@ async function getExtensionSettings() {
   });
 }
 
+// Perform the actual content analysis with educational exception checking
+function performContentAnalysis() {
+  const pageContent = document.body ? document.body.innerText.toLowerCase() : '';
+  const url = window.location.href;
+  const pageTitle = document.title ? document.title.toLowerCase() : '';
+
+  // Extended keywords for educational content
+  const educationalWords = [
+    'research', 'study', 'academic', 'education', 'scientific', 'analysis', 'university', 'paper', 'sex education'
+  ];
+  
+  // Phrases related to sensitive topics in an educational context
+  const educationalPhrases = [
+    'research on', 'study on', 'analysis of', 'effects of', 'impact of', 'prevention of'
+  ];
+  
+  let reason = '';
+  let isEducational = false;
+  
+  // Check if content is likely educational
+  if (extensionSettings.educationalMode) {
+    const contentToCheck = pageContent + ' ' + pageTitle;
+    
+    // Check for educational words
+    const educationalWordCount = educationalWords.filter(word => contentToCheck.includes(word)).length;
+    
+    // Check for educational phrases about sensitive topics (e.g., violence, suicide)
+    const hasSensitivePhrases = educationalPhrases.some(phrase => {
+      return (
+        pageContent.includes(phrase + ' violence') ||
+        pageContent.includes(phrase + ' suicide')
+      );
+    });
+    
+    // Determine if content is likely educational
+    isEducational = (educationalWordCount >= 3) || hasSensitivePhrases;
+    
+    console.log('Educational content detected:', isEducational);
+  }
+  
+  // Check for inappropriate content (NSFW, violence, suicide)
+  const nsfwWords = ['xxx', 'porn', 'adult content', 'nsfw'];
+  const violenceWords = ['kill', 'violence', 'attack'];
+  const suicideWords = ['suicide', 'self-harm'];
+  
+  // Always block suicidal content
+  if (suicideWords.some(word => pageContent.includes(word))) {
+    reason = 'suicide';
+  }
+  // Check for NSFW content (but allow educational content like sex education)
+  else if (nsfwWords.some(word => pageContent.includes(word)) && !isEducational) {
+    reason = 'NSFW';
+  }
+  // Check for violence
+  else if (violenceWords.some(word => pageContent.includes(word))) {
+    reason = 'violence';
+  }
+
+  // If content is inappropriate but educational, allow access
+  if (reason && isEducational && extensionSettings.educationalMode) {
+    console.log('Educational content detected, allowing access');
+    // Do not block the page, but still analyze images and videos
+    blurImages();
+  } else if (reason) {
+    // Block the page if content is inappropriate and not educational
+    blockPage(reason);
+  } else {
+    // Apply image blur for inappropriate content
+    blurImages();
+  }
+}
+
 // Analyze page content for inappropriate material
 function analyzePageContent() {
   if (isPageBlocked) return;
 
-  // Get page text content
-  const pageContent = document.body.innerText.toLowerCase();
-  const url = window.location.href;
-
-  // Keywords to check
-  const nsfwWords = ['xxx', 'porn', 'adult content'];
-  const violenceWords = ['violence', 'kill', 'murder', 'attack'];
-  const substanceWords = ['alcohol', 'drugs', 'cocaine'];
-
-  let reason = '';
-  
-  // Check for inappropriate content
-  if (nsfwWords.some(word => pageContent.includes(word))) {
-    reason = 'nsfw';
-  } else if (violenceWords.some(word => pageContent.includes(word))) {
-    reason = 'violence';
-  } else if (substanceWords.some(word => pageContent.includes(word))) {
-    reason = 'substance';
-  }
-
-  if (reason) {
-    blockPage(reason);
-  }
+  // Perform content analysis with educational exception checking
+  performContentAnalysis();
 }
 
 // Block page and show block page
@@ -119,6 +171,24 @@ function blockPage(reason) {
   } catch (error) {
     console.error('Error blocking page:', error);
   }
+}
+
+// Blur images that are potentially unsafe
+function blurImages() {
+  const images = document.querySelectorAll('img');
+  
+  images.forEach(img => {
+    const imgAlt = img.alt.toLowerCase();
+    const imgSrc = img.src.toLowerCase();
+    
+    // Keywords related to NSFW, violence, suicide
+    const unsafeKeywords = ['xxx', 'porn', 'violence', 'suicide', 'self-harm', 'attack'];
+    
+    // Check if the image contains any unsafe keywords in alt text or src URL
+    if (unsafeKeywords.some(keyword => imgAlt.includes(keyword) || imgSrc.includes(keyword))) {
+      img.style.filter = 'blur(10px)';
+    }
+  });
 }
 
 // Handle messages from the background script
