@@ -122,9 +122,20 @@ function blockPage(reason) {
     console.error('Error blocking page:', error);
   }
 }
+function simpleHash(str) {
+  let hash = 0;
+  if (str.length === 0) return hash.toString();
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  // Convert to positive hex string
+  return Math.abs(hash).toString(16);
+}
 
 // 👇 Reintegrated Sightengine logic here
-function blurImages() {
+async function blurImages() {
   const images = document.querySelectorAll('img');
   const unsafeKeywords = ['xxx', 'porn', 'violence', 'suicide', 'self-harm', 'attack'];
 
@@ -136,42 +147,95 @@ function blurImages() {
 
   const threshold = sensitivityThresholds[extensionSettings.sensitivity || 'medium'];
 
-  images.forEach(async (img) => {
-    const imgAlt = img.alt.toLowerCase();
-    const imgSrc = img.src.toLowerCase();
-
-    // Keyword check
-    if (unsafeKeywords.some(keyword => imgAlt.includes(keyword) || imgSrc.includes(keyword))) {
-      img.style.filter = 'blur(10px)';
-      return;
-    }
+  for (const img of images) {
+    const imgAlt = img.alt?.toLowerCase() || '';
+    const imgSrc = img.src?.toLowerCase() || '';
 
     // Skip base64/blob images
-    if (img.src.startsWith('data:') || img.src.startsWith('blob:')) return;
+    if (img.src.startsWith('data:') || img.src.startsWith('blob:')) continue;
 
-    try {
-      const apiUrl = `https://api.sightengine.com/1.0/check.json?models=nudity,wad,offensive&url=${encodeURIComponent(img.src)}&api_user=363518856&api_secret=kFFtELuEnWyJzzRL6MnAXKdyzRnTc6pU`;
-      const response = await fetch(apiUrl);
-      const data = await response.json();
+    let shouldBlur = unsafeKeywords.some(keyword =>
+      imgAlt.includes(keyword) || imgSrc.includes(keyword)
+    );
 
-      if (!data.status || data.status !== 'success') return;
+    if (!shouldBlur) {
+      try {
+        const apiUrl = `https://api.sightengine.com/1.0/check.json?models=nudity,wad,offensive&url=${encodeURIComponent(img.src)}&api_user=363518856&api_secret=kFFtELuEnWyJzzRL6MnAXKdyzRnTc6pU`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
 
-      const unsafeScore = Math.max(
-        data.nudity?.raw || 0,
-        data.weapon || 0,
-        data.alcohol || 0,
-        data.drugs || 0,
-        data.offensive?.prob || 0
-      );
+        if (data.status !== 'success') continue;
 
-      if (unsafeScore >= threshold) {
-        img.style.filter = 'blur(10px)';
+        const unsafeScore = Math.max(
+          data.nudity?.raw || 0,
+          data.weapon || 0,
+          data.alcohol || 0,
+          data.drugs || 0,
+          data.offensive?.prob || 0
+        );
+
+        if (unsafeScore >= threshold) {
+          shouldBlur = true;
+        }
+      } catch (error) {
+        console.warn('Sightengine error for image:', img.src, error);
       }
-    } catch (error) {
-      console.warn('Sightengine error for image:', img.src, error);
     }
-  });
+
+    if (shouldBlur) {
+      // Wrap image in a container
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.display = 'inline-block';
+
+      const parent = img.parentNode;
+      parent.insertBefore(wrapper, img);
+      wrapper.appendChild(img);
+
+      // Blur the image
+      img.style.filter = 'blur(10px)';
+      img.style.transition = 'filter 0.3s ease';
+
+      // Create unlock button
+      const button = document.createElement('button');
+      button.innerText = 'Show Image';
+      Object.assign(button.style, {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: '9999',
+        backgroundColor: '#000',
+        color: '#fff',
+        padding: '6px 10px',
+        borderRadius: '5px',
+        border: 'none',
+        cursor: 'pointer',
+        opacity: '0.85'
+      });
+
+      wrapper.appendChild(button);
+
+      // Handle unlock logic
+      button.addEventListener('click', async () => {
+        const enteredPassword = prompt('Enter extension password to view this image:');
+        const settings = await getExtensionSettings();
+
+        // Compare hashed passwords
+        const hashedInput = simpleHash(enteredPassword);
+        const correctHash = settings.password;
+
+        if (!settings.isPasswordProtected || !correctHash || hashedInput === correctHash) {
+          img.style.filter = 'none';
+          button.remove();
+        } else {
+          alert('Incorrect password.');
+        }
+      });
+    }
+  }
 }
+
 
 function handleMessages(message, sender, sendResponse) {
   switch (message.type) {
